@@ -1,0 +1,12 @@
+app_port: 8081
+app_images: "country-service:latest"
+app_user: "appuser"
+app_uid: 1000
+
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+
+firewall_allowed_ports:
+  - "{{ app_port }}"
+  - "{{ ssh_port }}"

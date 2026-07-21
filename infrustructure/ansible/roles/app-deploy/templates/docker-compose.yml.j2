@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  country-service:
+    image: "{{ app_image }}"
+    ports:
+      - "{{ app_port }}:{{ app_port }}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    user: "{{ app_uid }}:{{ app_uid }}"

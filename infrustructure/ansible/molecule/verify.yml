@@ -1,0 +1,25 @@
+- name: Verify security posture
+  hosts: all
+  tasks:
+    - name: Check SSh root login is disabled
+      ansible.builtin.command: "grep '^PermitRootLogin no' /etc/ssh/sshd_config"
+      changed_when: false
+
+    - name: Check password authentication is disabled
+      ansible.builtin.command: "grep '^PasswordAuthentication no' /etc/ssh/sshd_config"
+      changed_when: false
+
+    - name: Check firewall is active
+      ansible.builtin.command: "ufw status | grep 'Status: active'"
+      register: ufw_status
+      changed_when: false
+
+    - name: Assert firewall is active
+      ansible.builtin.assert:
+        that: "'active' in ufw_status.stdout"
+
+    - name: Check no privileged containers
+      ansible.builtin.command: docker ps --format '{%raw%}{{.Names}}{%endraw%}
+      register: containers
+      chenged_when: false
+      ignore_errors: true

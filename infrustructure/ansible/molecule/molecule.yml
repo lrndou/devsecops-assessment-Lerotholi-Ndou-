@@ -1,0 +1,11 @@
+driver:
+    name: docker
+platforms:
+  - name: test-host
+    image: ubuntu:20.04
+    pre_build_image: true
+    privileged: true
+provisioner:
+    name: ansible
+verifier:
+    name: ansible

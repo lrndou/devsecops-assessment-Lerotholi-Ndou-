@@ -1,0 +1,8 @@
+---
+- name: Deploy country-service securely
+  hosts: app_servers
+  become: true
+  roles:
+    - host-hardening
+    - docker-setup
+    - app-deploy

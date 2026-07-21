@@ -1,0 +1,19 @@
+---
+- name: Create app directory
+  ansible.builtin.file:
+    path: /opt/country-service
+    state: directory
+    owner: "{{ app_user }}"
+    mode: "0750"
+
+- name: Deploy docker-compose config
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/country-service/docker-compose.yml
+    owner: "{{ app_user }}"
+    mode: "0640"
+
+- name: Start application
+  community.docker.docker_compose_v2:
+    project_src: /opt/country-service
+    state: present

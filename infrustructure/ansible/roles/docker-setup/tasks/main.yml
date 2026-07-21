@@ -1,0 +1,35 @@
+---
+- name: Install Docker dependencies
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Create app user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    uid: "{{ app_uid }}"
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Configure Docker daemon security
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "userns-remap": "default",
+        "no-new-privileges": true,
+        "live-restore": true,
+        "log-driver": "json-file",
+        "log-opts": {"max-size": "10m", "max-file": "3"}
+      }
+    mode: "0644"
+  notify: restart docker
+
+- name: Ensure Docker is running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true

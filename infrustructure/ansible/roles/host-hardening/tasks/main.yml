@@ -1,0 +1,43 @@
+---
+- name: Disable unnecessary services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - cups
+    - avahi-daemon
+    - bluetooth
+  ignore_errors: true
+
+- name: Configure SSH hardening
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+  notify: restart sshd
+
+- name: Configure firewall - default deny
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Allow required ports only
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] }}"
+  loop: "{{ firewall_allowed_ports }}"
+
+- name: Set restrictive file permissions on sensitive dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0700"
+  loop:
+    - /root
+    - /etc/ssl/private
