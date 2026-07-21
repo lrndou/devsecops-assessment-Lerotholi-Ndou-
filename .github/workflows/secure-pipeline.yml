@@ -1,0 +1,101 @@
+name: Secure Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build country-service
+        run: cd country-service-main && ./mvnw package -B
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: country-flags-app/package-lock.json
+
+      - name: Build country-flags-app
+        run: cd country-service-main && npm ci && npm run build
+
+security_scan:
+  needs: build_and_test
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install security scanners
+      run: pip install semgrep pip-audit detect-secrets
+
+    - name: Run Multi-Scanner Orchestration
+      run: python scripts/multi-scanner-orchestrator/orchestrator.py --target ./country-service-main --format json
+
+    - name: Run npm audit (SCA for frontend)
+      run: cd country-flags-app-main && npm audit --audit-level=high
+      continue-on-error: true
+
+container_scan:
+  needs: security_scan
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+    security-events: write
+  steps:
+    - uses: actions/checkout@v3
+
+    - name: Build Docker image
+      run: docker build -f docker/Dockerfile -t country-service:scan country-service-main/
+
+    - name: Run Trivy scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: country-service:scan
+        format: 'json'
+        output: 'trivy-report.json'
+        exit-code: '1'
+        severity-threshold: 'CRITICAL,HIGH'
+
+    - name: Upload scan results on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: trivy-report.json
+
+
+quality_gate:
+  needs: [ security_scan, container_scan ]
+  runs-on: ubuntu-latest
+  if: always()
+  steps:
+    - name: Check scan results
+      run: |
+        if [ "${{needs.security-scan.result}}" == "failure" ] || [ "${{needs.container-scan.result}}" == "failure" ]; then
+          echo "Security scan failed. Failing the job."
+          exit 1
+        else
+          echo "All scans passed. Proceeding with the pipeline."
+        fi
